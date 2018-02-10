@@ -6,6 +6,8 @@ Main script for synthetic text rendering.
 """
 
 from __future__ import division
+from __future__ import print_function
+
 import copy
 import cv2
 import h5py
@@ -21,6 +23,8 @@ import text_utils as tu
 from colorize3_poisson import Colorize
 from common import *
 import traceback, itertools
+
+import time
 
 
 class TextRegions(object):
@@ -323,23 +327,23 @@ def viz_masks(fignum,rgb,seg,depth,label):
         plt.imshow(ims[i])
     plt.show(block=False)
 
-def viz_regions(img,xyz,seg,planes,labels):
-    """
-    img,depth,seg are images of the same size.
-    visualizes depth masks for top NOBJ objects.
-    """
-    # plot the RGB-D point-cloud:
-    su.plot_xyzrgb(xyz.reshape(-1,3),img.reshape(-1,3))
+# def viz_regions(img,xyz,seg,planes,labels):
+#     """
+#     img,depth,seg are images of the same size.
+#     visualizes depth masks for top NOBJ objects.
+#     """
+#     # plot the RGB-D point-cloud:
+#     su.plot_xyzrgb(xyz.reshape(-1,3),img.reshape(-1,3))
 
-    # plot the RANSAC-planes at the text-regions:
-    for i,l in enumerate(labels):
-        mask = seg==l
-        xyz_region = xyz[mask,:]
-        su.visualize_plane(xyz_region,np.array(planes[i]))
+#     # plot the RANSAC-planes at the text-regions:
+#     for i,l in enumerate(labels):
+#         mask = seg==l
+#         xyz_region = xyz[mask,:]
+#         su.visualize_plane(xyz_region,np.array(planes[i]))
 
-    mym.view(180,180)
-    mym.orientation_axes()
-    mym.show(True)
+#     mym.view(180,180)
+#     mym.orientation_axes()
+#     mym.show(True)
  
 def viz_textbb(fignum,text_im, bb_list,alpha=1.0):
     """
@@ -469,7 +473,7 @@ class RendererV3(object):
         return is_good
 
 
-    def get_min_h(selg, bb, text):
+    def get_min_h(self, bb, text):
         # find min-height:
         h = np.linalg.norm(bb[:,3,:] - bb[:,0,:], axis=0)
         # remove newlines and spaces:
@@ -629,7 +633,7 @@ class RendererV3(object):
         for i in xrange(ninstance):
             place_masks = copy.deepcopy(regions['place_mask'])
 
-            print colorize(Color.CYAN, " ** instance # : %d"%i)
+            print(colorize(Color.CYAN, " ** instance # : %d"%i))
 
             idict = {'img':[], 'charBB':None, 'wordBB':None, 'txt':None}
 
@@ -660,7 +664,7 @@ class RendererV3(object):
                                                              regions['homography'][ireg],
                                                              regions['homography_inv'][ireg])
                 except TimeoutException, msg:
-                    print msg
+                    print(msg)
                     continue
                 except:
                     traceback.print_exc()

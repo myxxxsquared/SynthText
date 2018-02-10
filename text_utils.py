@@ -1,4 +1,6 @@
 from __future__ import division
+from __future__ import print_function
+
 import numpy as np
 import matplotlib.pyplot as plt 
 import scipy.io as sio
@@ -19,6 +21,11 @@ from common import *
 def sample_weighted(p_dict):
     ps = p_dict.keys()
     return p_dict[np.random.choice(ps,p=ps)]
+
+def my_sample_weighted(p_dict):
+    keys = list(p_dict.keys())
+    ps = list(p_dict.values())
+    return keys[np.random.choice(len(keys), p=ps)]
 
 def move_bb(bbs, t):
     """
@@ -369,7 +376,7 @@ class RenderFont(object):
             #print colorize(Color.GREEN, text)
 
             # render the text:
-            txt_arr,txt,bb = self.render_curved(font, text)
+            txt_arr,txt,bb = self.render_curved(font, ' '.join(text.split('&')))
             bb = self.bb_xywh2coords(bb)
 
             # make sure that the text-array is not bigger than mask array:
@@ -380,7 +387,7 @@ class RenderFont(object):
             # position the text within the mask:
             text_mask,loc,bb, _ = self.place_text([txt_arr], mask, [bb])
             if len(loc) > 0:#successful in placing the text collision-free:
-                return text_mask,loc[0],bb[0],text
+                return text_mask,loc[0],bb[0],''.join(text.split('&'))
         return #None
 
 
@@ -606,6 +613,8 @@ class TextSource(object):
         return self.fdict[kind](nline_max,nchar_max)
         
     def sample_word(self,nline_max,nchar_max,niter=100):
+        # print("sample_word")
+
         rand_line = self.txt[np.random.choice(len(self.txt))]                
         words = rand_line.split()
         rand_word = random.choice(words)
@@ -624,6 +633,8 @@ class TextSource(object):
 
 
     def sample_line(self,nline_max,nchar_max):
+        # print("sample_line")
+
         nline = nline_max+1
         while nline > nline_max:
             nline = np.random.choice([1,2,3], p=self.p_line_nline)
@@ -640,6 +651,24 @@ class TextSource(object):
             return []
 
     def sample_para(self,nline_max,nchar_max):
+        # print("sample_para")
+
+        spacing_dict = {
+            0: 0.5,
+            1: 0.4,
+            2: 0.1,
+        }
+
+        if nchar_max == 0:
+            spacing = 0
+        else:
+            spacing = my_sample_weighted(spacing_dict)
+            while spacing+1 > nchar_max:
+                spacing = my_sample_weighted(spacing_dict)
+
+        nchar_max = nchar_max // (spacing + 1)
+
+
         # get number of lines in the paragraph:
         nline = nline_max*sstat.beta.rvs(a=self.p_para_nline[0], b=self.p_para_nline[1])
         nline = max(1, int(np.ceil(nline)))
@@ -654,6 +683,6 @@ class TextSource(object):
             # center align the paragraph-text:
             if np.random.rand() < self.center_para:
                 lines = self.center_align(lines)
-            return '\n'.join(lines)
+            return ('&'*spacing).join(list('\n'.join(lines)))
         else:
             return []
