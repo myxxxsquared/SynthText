@@ -53,7 +53,7 @@ def get_mask_parallel(ucm_imname):
     ucm,imname = ucm_imname
     try:
         return (get_mask(ucm.T),imname)
-    except:
+    except Exception:
         return None
         #traceback.print_exc(file=sys.stdout)
 

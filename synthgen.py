@@ -508,6 +508,16 @@ class RendererV3(object):
         else:
             text_mask,loc,bb,text = render_res
 
+        wrds = text.split()
+        bb_idx = np.r_[0, np.cumsum([len(w) for w in wrds])]
+        for i in xrange(len(wrds)):
+            cc = bb[:,:,bb_idx[i]:bb_idx[i+1]]
+            cc = np.squeeze(np.concatenate(np.dsplit(cc,cc.shape[-1]),axis=1)).T.astype('float32')
+            rect = cv2.minAreaRect(cc.copy())
+            box = cv2.cv.BoxPoints(rect)
+            # print(box)
+            cv2.fillPoly(collision_mask, np.array([box], dtype=np.int32), 255)
+
         # update the collision mask with text:
         collision_mask += (255 * (text_mask>0)).astype('uint8')
 
@@ -623,7 +633,7 @@ class RendererV3(object):
             nregions = len(regions['place_mask'])
             if nregions < 1: # no good region to place text on
                 return []
-        except:
+        except Exception:
             # failure in pre-text placement
             #import traceback
             traceback.print_exc()
@@ -633,7 +643,7 @@ class RendererV3(object):
         for i in xrange(ninstance):
             place_masks = copy.deepcopy(regions['place_mask'])
 
-            print(colorize(Color.CYAN, " ** instance # : %d"%i))
+            # print(colorize(Color.CYAN, " ** instance # : %d"%i))
 
             idict = {'img':[], 'charBB':None, 'wordBB':None, 'txt':None}
 
@@ -649,7 +659,7 @@ class RendererV3(object):
 
             # process regions: 
             num_txt_regions = len(reg_idx)
-            NUM_REP = 5 # re-use each region three times:
+            NUM_REP = 3 # re-use each region three times:
             reg_range = np.arange(NUM_REP * num_txt_regions) % num_txt_regions
             for idx in reg_range:
                 ireg = reg_idx[idx]
@@ -666,7 +676,7 @@ class RendererV3(object):
                 except TimeoutException, msg:
                     print(msg)
                     continue
-                except:
+                except Exception:
                     traceback.print_exc()
                     # some error in placing text on the region
                     continue

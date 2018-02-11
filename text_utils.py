@@ -458,7 +458,7 @@ class FontState(object):
             w /= np.sum(w)
             r_avg = np.sum(w*r)
             return r_avg
-        except:
+        except Exception:
             return 1.0
 
     def get_font_size(self, font, font_size_px):
