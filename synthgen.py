@@ -463,9 +463,13 @@ class RendererV3(object):
         hw = hw[alnum,:]
 
         min_h0, min_h = np.min(hw0[:,0]), np.min(hw[:,0])
+        if np.any(hw0[:,1] == 0):
+            return False
         asp0, asp = hw0[:,0]/hw0[:,1], hw[:,0]/hw[:,1]
         asp0, asp = np.median(asp0), np.median(asp)
 
+        if asp0 == 0:
+            return False
         asp_ratio = asp/asp0
         is_good = ( min_h > self.min_char_height
                     and asp_ratio > self.min_asp_ratio
@@ -487,16 +491,20 @@ class RendererV3(object):
 
     def feather(self, text_mask, min_h):
         # determine the gaussian-blur std:
-        if min_h <= 15 :
-            bsz = 0.25
-            ksz=1
-        elif 15 < min_h < 30:
-            bsz = max(0.30, 0.5 + 0.1*np.random.randn())
-            ksz = 3
-        else:
-            bsz = max(0.5, 1.5 + 0.5*np.random.randn())
-            ksz = 5
-        return cv2.GaussianBlur(text_mask,(ksz,ksz),bsz)
+        # PARAM: blur
+
+        if np.random.rand() < 0.2:
+            if min_h <= 15 :
+                bsz = 0.25
+                ksz=1
+            elif 15 < min_h < 30:
+                bsz = max(0.30, 0.5 + 0.1*np.random.randn())
+                ksz = 3
+            else:
+                bsz = max(0.5, 1.5 + 0.5*np.random.randn())
+                ksz = 5
+            return cv2.GaussianBlur(text_mask,(ksz,ksz),bsz)
+        return text_mask
 
     def place_text(self,rgb,collision_mask,H,Hinv):
         font = self.text_renderer.font_state.sample()

@@ -312,14 +312,18 @@ class Colorize(object):
         return text_arr blit onto bg_arr.
         """
         # decide on a color for the text:
+
         l_text, fg_col, bg_col = self.color_text(text_arr, min_h, bg_arr)
         bg_col = np.mean(np.mean(bg_arr,axis=0),axis=0)
         l_bg = Layer(alpha=255*np.ones_like(text_arr,'uint8'),color=bg_col)
 
-        l_text.alpha = l_text.alpha * np.clip(0.88 + 0.1*np.random.randn(), 0.72, 1.0)
+        # PARAM: text alpha
+        if np.random.rand() < 0.5:
+            l_text.alpha = l_text.alpha * np.clip(0.9 + 0.1*np.random.randn(), 0.8, 1.0)
         layers = [l_text]
         blends = []
 
+        # PARAM: border
         # add border:
         if np.random.rand() < self.p_border:
             if min_h <= 15 : bsz = 1
@@ -330,6 +334,7 @@ class Colorize(object):
             layers.append(l_border)
             blends.append('normal')
 
+        # PARAM: shadow
         # add shadow:
         if np.random.rand() < self.p_drop_shadow:
             # shadow gaussian size:
@@ -352,16 +357,23 @@ class Colorize(object):
             l_shadow = Layer(shadow, 0)
             layers.append(l_shadow)
             blends.append('normal')
-        
 
-        l_bg = Layer(alpha=255*np.ones_like(text_arr,'uint8'), color=bg_col)
-        layers.append(l_bg)
-        blends.append('normal')
-        l_normal = self.merge_down(layers,blends)
-        # now do poisson image editing:
-        l_bg = Layer(alpha=255*np.ones_like(text_arr,'uint8'), color=bg_arr)
-        l_out =  blit_images(l_normal.color,l_bg.color.copy())
-        
+        # PARAM: possion image editing
+        if np.random.rand() < 0.5:
+            l_bg = Layer(alpha=255*np.ones_like(text_arr,'uint8'), color=bg_col)
+            layers.append(l_bg)
+            blends.append('normal')
+            l_normal = self.merge_down(layers,blends)
+            # now do poisson image editing:
+            l_bg = Layer(alpha=255*np.ones_like(text_arr,'uint8'), color=bg_arr)
+            l_out =  blit_images(l_normal.color,l_bg.color.copy())
+        else:
+            l_bg = Layer(alpha=255*np.ones_like(text_arr,'uint8'), color=bg_arr)
+            layers.append(l_bg)
+            blends.append('normal')
+            l_normal = self.merge_down(layers,blends)
+            l_out = l_normal.color
+
         # plt.subplot(1,3,1)
         # plt.imshow(l_normal.color)
         # plt.subplot(1,3,2)

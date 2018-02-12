@@ -63,8 +63,9 @@ def crop_safe(arr, rect, bbs=[], pad=0):
 class BaselineState(object):
     curve = lambda this, a: lambda x: a*x*x
     differential = lambda this, a: lambda x: 2*a*x
-    a = [0.50, 0.05]
+    a = [2, 0.05]
 
+    # PARAM: curve
     def get_sample(self):
         """
         Returns the functions for the curve and differential for a and b
@@ -87,6 +88,8 @@ class RenderFont(object):
     """
 
     def __init__(self, data_dir='data'):
+        pygame.init()
+
         # distribution over the type of text:
         # whether to get a single word, paragraph or a line:
         self.p_text = {0.0 : 'WORD',
@@ -114,8 +117,6 @@ class RenderFont(object):
         # get font-state object:
         self.font_state = FontState(data_dir)
 
-        pygame.init()
-
     def render_multiline(self,font,text):
         """
         renders multiline TEXT on the pygame surface SURF with the
@@ -131,6 +132,7 @@ class RenderFont(object):
 
         # font parameters:
         line_spacing = font.get_sized_height() + 1
+        # PARAM: line spacing
         
         # initialize the surface to proper size:
         line_bounds = font.get_rect(lines[np.argmax(lengths)])
@@ -139,6 +141,11 @@ class RenderFont(object):
 
         bbs = []
         space = font.get_rect('O')
+        # PARAM: space width
+        if np.random.rand() < 0.5:
+            spacewidth = space.width * np.clip(np.random.randn()*0.5+0.5, 0.2, 1.5)
+        else:
+            spacewidth = space.width * np.clip(np.random.randn()*0.5+2.0, 1.0, 3.0)
         x, y = 0, 0
         for l in lines:
             x = 0 # carriage-return
@@ -146,7 +153,7 @@ class RenderFont(object):
 
             for ch in l: # render each character
                 if ch.isspace(): # just shift
-                    x += space.width
+                    x += spacewidth
                 else:
                     # render the character
                     ch_bounds = font.render_to(surf, (x,y), ch)
@@ -174,7 +181,7 @@ class RenderFont(object):
         use curved baseline for rendering word
         """
         wl = len(word_text)
-        isword = len(word_text.split())==1
+        isword = word_text.find('\n') == -1 and len(word_text.split()) <= 5
 
         # do curved iff, the length of the word <= 10
         if not isword or wl > 10 or np.random.rand() > self.p_curved:
@@ -207,11 +214,14 @@ class RenderFont(object):
         # render chars to the left and right:
         last_rect = rect
         ch_idx = []
+        trueindex = 0
         for i in xrange(wl):
             #skip the middle character
             if i==mid_idx: 
-                bbs.append(mid_ch_bb)
-                ch_idx.append(i)
+                if word_text[mid_idx] != ' ':
+                    bbs.append(mid_ch_bb)
+                    ch_idx.append(trueindex)
+                    trueindex += 1
                 continue
 
             if i < mid_idx: #left-chars
@@ -219,7 +229,6 @@ class RenderFont(object):
             elif i==mid_idx+1: #right-chars begin
                 last_rect = rect
 
-            ch_idx.append(i)
             ch = word_text[i]
 
             newrect = font.get_rect(ch)
@@ -235,7 +244,10 @@ class RenderFont(object):
                 bbrect = font.render_to(surf, newrect, ch)
             bbrect.x = newrect.x + bbrect.x
             bbrect.y = newrect.y - bbrect.y
-            bbs.append(np.array(bbrect))
+            if ch != ' ':
+                ch_idx.append(trueindex)
+                bbs.append(np.array(bbrect))
+                trueindex += 1
             last_rect = newrect
         
         # correct the bounding-box order:
@@ -418,22 +430,53 @@ class FontState(object):
     random_kerning = 0.2
     random_kerning_amount = 0.1
 
+    def init_font_model(self):
+        newfontlist = []
+        ys = np.arange(8,200)
+        A = np.c_[ys,np.ones_like(ys)]
+        models = {}
+        for fontname in self.fonts:
+            font = freetype.Font(fontname, size=12)
+            h = []
+            for y in ys:
+                h.append(font.get_sized_glyph_height(y))
+            h = np.array(h)
+            m,_,_,_ = np.linalg.lstsq(A,h)
+            models[font.name] = m
+            rect = font.get_rect('O')
+            if rect.width:
+                newfontlist.append(fontname)
+        self.font_model = models
+        self.fonts = newfontlist
+
+        with open('font_px2pt.cp','w') as f:
+            cp.dump(models,f)
+
     def __init__(self, data_dir='data'):
 
         char_freq_path = osp.join(data_dir, 'models/char_freq.cp')        
-        font_model_path = osp.join(data_dir, 'models/font_px2pt.cp')
+        # font_model_path = osp.join(data_dir, 'models/font_px2pt.cp')
 
         # get character-frequencies in the English language:
         with open(char_freq_path,'r') as f:
             self.char_freq = cp.load(f)
 
         # get the model to convert from pixel to font pt size:
-        with open(font_model_path,'r') as f:
-            self.font_model = cp.load(f)
+        # with open(font_model_path,'r') as f:
+        #     self.font_model = cp.load(f)
 
         # get the names of fonts to use:
         self.FONT_LIST = osp.join(data_dir, 'fonts/fontlist.txt')
         self.fonts = [os.path.join(data_dir,'fonts',f.strip()) for f in open(self.FONT_LIST)]
+
+        newfonts_folder = osp.join(data_dir, 'fonts', 'newfonts')
+        newfonts = os.listdir(newfonts_folder)
+        for newfont in newfonts:
+            if newfont.lower().endswith('.ttf'):
+                self.fonts.append(osp.join(newfonts_folder, newfont))
+
+        self.init_font_model()
+
 
 
     def get_aspect_ratio(self, font, size=None):
@@ -495,6 +538,8 @@ class FontState(object):
         Initializes a pygame font.
         FS : font-state sample
         """
+
+        # PARAM: underline, strong, oblique, strength
         font = freetype.Font(fs['font'], size=fs['size'])
         font.underline = fs['underline']
         font.underline_adjustment = fs['underline_adjustment']
@@ -654,9 +699,9 @@ class TextSource(object):
         # print("sample_para")
 
         spacing_dict = {
-            0: 0.5,
-            1: 0.4,
-            2: 0.1,
+            0: 0.7,
+            1: 0.25,
+            2: 0.05
         }
 
         if nchar_max == 0:
