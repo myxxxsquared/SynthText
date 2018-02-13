@@ -318,8 +318,8 @@ class Colorize(object):
         l_bg = Layer(alpha=255*np.ones_like(text_arr,'uint8'),color=bg_col)
 
         # PARAM: text alpha
-        if np.random.rand() < 0.5:
-            l_text.alpha = l_text.alpha * np.clip(0.9 + 0.1*np.random.randn(), 0.8, 1.0)
+        if np.random.rand() < 0.8:
+            l_text.alpha = l_text.alpha * np.clip(0.8 + 0.1*np.random.randn(), 0.5, 1.0)
         layers = [l_text]
         blends = []
 
@@ -359,7 +359,7 @@ class Colorize(object):
             blends.append('normal')
 
         # PARAM: possion image editing
-        if np.random.rand() < 0.5:
+        if np.random.rand() < 0.8:
             l_bg = Layer(alpha=255*np.ones_like(text_arr,'uint8'), color=bg_col)
             layers.append(l_bg)
             blends.append('normal')

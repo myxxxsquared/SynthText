@@ -136,7 +136,7 @@ class RenderFont(object):
         
         # initialize the surface to proper size:
         line_bounds = font.get_rect(lines[np.argmax(lengths)])
-        fsize = (round(2.0*line_bounds.width), round(1.25*line_spacing*len(lines)))
+        fsize = (round(5.0*line_bounds.width), round(1.25*line_spacing*len(lines)))
         surf = pygame.Surface(fsize, pygame.locals.SRCALPHA, 32)
 
         bbs = []
@@ -213,9 +213,9 @@ class RenderFont(object):
         # place middle char
         rect = font.get_rect(word_text[mid_idx])
         rect.centerx = surf.get_rect().centerx
-        rect.centery = fsize[1] + rect.height + yfunc(0)
+        rect.centery = fsize[1] / 2 + rect.height + yfunc(0)
         # rect.centery +=  yfunc(0)
-        try
+        try:
             ch_bounds = font.render_to(surf, rect, word_text[mid_idx], rotation=tfunc(0))
         except ValueError:
             ch_bounds = font.render_to(surf, rect, word_text[mid_idx])
@@ -226,15 +226,19 @@ class RenderFont(object):
         # render chars to the left and right:
         last_rect = rect
         ch_idx = []
-        trueindex = 0
+        # trueindex = 0
         olddeltax = 0.0
+
+        if word_text[mid_idx] != ' ':
+            bbs.append(ch_bounds)
+
         for i in xrange(wl):
             #skip the middle character
             if i==mid_idx: 
-                if word_text[mid_idx] != ' ':
-                    bbs.append(mid_ch_bb)
-                    ch_idx.append(trueindex)
-                    trueindex += 1
+                # if word_text[mid_idx] != ' ':
+                    # bbs.append(mid_ch_bb)
+                    # ch_idx.append(trueindex)
+                    # trueindex += 1
                 continue
 
             if i < mid_idx: #left-chars
@@ -256,20 +260,27 @@ class RenderFont(object):
             # newrect.centery = surf.get_rect().centery + rect.height
             newrect.centery += yfunc(deltax) - yfunc(olddeltax)
             olddeltax = deltax
-            bbrect = font.render_to(surf, newrect, ch, rotation=tfunc(deltax))
+            try:
+                bbrect = font.render_to(surf, newrect, ch, rotation=tfunc(deltax))
+            except ValueError:
+                bbrect = font.render_to(surf, newrect, ch)
             bbrect.x = newrect.x + bbrect.x
             bbrect.y = newrect.y - bbrect.y
             if ch != ' ':
-                ch_idx.append(trueindex)
-                bbs.append(np.array(bbrect))
-                trueindex += 1
+                if i > mid_idx:
+                    bbs.append(np.array(bbrect))
+                else:
+                    bbs = [np.array(bbrect)] + bbs
+                # ch_idx.append(trueindex)
+                # bbs.append(np.array(bbrect))
+                # trueindex += 1
             last_rect = newrect
         
         # correct the bounding-box order:
-        bbs_sequence_order = [None for i in ch_idx]
-        for idx,i in enumerate(ch_idx):
-            bbs_sequence_order[i] = bbs[idx]
-        bbs = bbs_sequence_order
+        # bbs_sequence_order = [None for i in ch_idx]
+        # for idx,i in enumerate(ch_idx):
+        #     bbs_sequence_order[i] = bbs[idx]
+        # bbs = bbs_sequence_order
 
         # get the union of characters for cropping:
         r0 = pygame.Rect(bbs[0])
@@ -277,6 +288,10 @@ class RenderFont(object):
 
         # crop the surface to fit the text:
         bbs = np.array(bbs)
+        # print(bbs.shape)
+        for bb in bbs:
+            if bb[0] < 0 or bb[1] < 0 or bb[2]+bb[0] > fsize[0] or bb[3]+bb[1] > fsize[1]:
+                return None, None, None
         surf_arr, bbs = crop_safe(pygame.surfarray.pixels_alpha(surf), rect_union, bbs, pad=5)
         surf_arr = surf_arr.swapaxes(0,1)
         return surf_arr, word_text, bbs
@@ -404,6 +419,9 @@ class RenderFont(object):
 
             # render the text:
             txt_arr,txt,bb = self.render_curved(font, ' '.join(text.split('&')))
+            if bb is None:
+                continue
+
             bb = self.bb_xywh2coords(bb)
 
             # make sure that the text-array is not bigger than mask array:
