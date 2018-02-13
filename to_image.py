@@ -7,15 +7,18 @@ import numpy as np
 import os
 import argparse
 
+from itertools import islice
+
 def main():
     parser = argparse.ArgumentParser(description='convert pkl file to image to preview')
     parser.add_argument('--input_folder', type=str)
     parser.add_argument('--output_folder', type=str)
+    parser.add_argument('--nimages', type=int)
     args = parser.parse_args()
 
     files = list(filter((lambda x: x.endswith('.bin')), os.listdir(args.input_folder)))
 
-    for f in files:
+    for f in islice(files, args.nimages):
         try:
             fname = os.path.join(args.input_folder, f)
             with open(fname, 'rb') as pklfile:

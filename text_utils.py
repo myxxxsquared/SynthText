@@ -181,32 +181,44 @@ class RenderFont(object):
         use curved baseline for rendering word
         """
         wl = len(word_text)
-        isword = word_text.find('\n') == -1 and len(word_text.split()) <= 5
+        isword = word_text.find('\n') == -1 \
+            and len(word_text.split()) <= 5 \
+            and len(word_text)/len(word_text.split()) > 2
 
         # do curved iff, the length of the word <= 10
-        if not isword or wl > 10 or np.random.rand() > self.p_curved:
+        if not isword or wl > 20 or np.random.rand() > self.p_curved:
             return self.render_multiline(font, word_text)
 
         # create the surface:
         lspace = font.get_sized_height() + 1
         lbound = font.get_rect(word_text)
-        fsize = (round(2.0*lbound.width), round(3*lspace))
+        fsize = (round(3.0*lbound.width), round(lspace*10))
         surf = pygame.Surface(fsize, pygame.locals.SRCALPHA, 32)
+
+        # rho = (2 + np.random.rand()*10)*lbound.width
+        rho = lbound.width * (1.0 + np.random.rand()**3 * 10)
+        rho_signal = -1 if np.random.rand() < 0.5 else 1
+        ravg = (rho - math.sqrt(rho*rho - lbound.width*lbound.width)) / 2
+        yfunc = lambda x: (math.sqrt(rho*rho - x*x) - ravg) * rho_signal
+        tfunc = lambda x: -int(round(math.degrees(math.asin(x/rho)))) * rho_signal
 
         # baseline state
         mid_idx = wl//2
-        BS = self.baselinestate.get_sample()
-        curve = [BS['curve'](i-mid_idx) for i in xrange(wl)]
-        curve[mid_idx] = -np.sum(curve) / (wl-1)
-        rots  = [-int(math.degrees(math.atan(BS['diff'](i-mid_idx)/(font.size/2)))) for i in xrange(wl)]
+        # BS = self.baselinestate.get_sample()
+        # curve = [BS['curve'](i-mid_idx) for i in xrange(wl)]
+        # curve[mid_idx] = -np.sum(curve) / (wl-1)
+        # rots  = [-int(math.degrees(math.atan(BS['diff'](i-mid_idx)/(font.size/2)))) for i in xrange(wl)]
 
         bbs = []
         # place middle char
         rect = font.get_rect(word_text[mid_idx])
         rect.centerx = surf.get_rect().centerx
-        rect.centery = surf.get_rect().centery + rect.height
-        rect.centery +=  curve[mid_idx]
-        ch_bounds = font.render_to(surf, rect, word_text[mid_idx], rotation=rots[mid_idx])
+        rect.centery = fsize[1] + rect.height + yfunc(0)
+        # rect.centery +=  yfunc(0)
+        try
+            ch_bounds = font.render_to(surf, rect, word_text[mid_idx], rotation=tfunc(0))
+        except ValueError:
+            ch_bounds = font.render_to(surf, rect, word_text[mid_idx])
         ch_bounds.x = rect.x + ch_bounds.x
         ch_bounds.y = rect.y - ch_bounds.y
         mid_ch_bb = np.array(ch_bounds)
@@ -215,6 +227,7 @@ class RenderFont(object):
         last_rect = rect
         ch_idx = []
         trueindex = 0
+        olddeltax = 0.0
         for i in xrange(wl):
             #skip the middle character
             if i==mid_idx: 
@@ -228,6 +241,7 @@ class RenderFont(object):
                 i = mid_idx-1-i
             elif i==mid_idx+1: #right-chars begin
                 last_rect = rect
+                olddeltax = 0.0
 
             ch = word_text[i]
 
@@ -237,11 +251,12 @@ class RenderFont(object):
                 newrect.topleft = (last_rect.topright[0]+2, newrect.topleft[1])
             else:
                 newrect.topright = (last_rect.topleft[0]-2, newrect.topleft[1])
-            newrect.centery = max(newrect.height, min(fsize[1] - newrect.height, newrect.centery + curve[i]))
-            try:
-                bbrect = font.render_to(surf, newrect, ch, rotation=rots[i])
-            except ValueError:
-                bbrect = font.render_to(surf, newrect, ch)
+            deltax = surf.get_rect().centerx-newrect.centerx
+            # newrect.centery = max(newrect.height, min(fsize[1] - newrect.height, surf.get_rect().centery + rect.height + yfunc(deltax)))
+            # newrect.centery = surf.get_rect().centery + rect.height
+            newrect.centery += yfunc(deltax) - yfunc(olddeltax)
+            olddeltax = deltax
+            bbrect = font.render_to(surf, newrect, ch, rotation=tfunc(deltax))
             bbrect.x = newrect.x + bbrect.x
             bbrect.y = newrect.y - bbrect.y
             if ch != ' ':
